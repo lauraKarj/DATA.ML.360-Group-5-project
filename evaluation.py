@@ -138,3 +138,44 @@ def check_against_sklearn(top, relevant, n_users=200):
             diffs[metric].append(abs(ours[metric].iloc[i] - value))
     return pd.DataFrame({"metric": list(diffs), "max_abs_diff": [max(v) for v in diffs.values()],
                          "n_users": len(sample)})
+
+
+def most_popular_recent(history, eval_set, items,
+                        quantile=0.8):
+
+    cutoff = history["Timestamp"].quantile(
+        quantile
+    )
+
+    recent = history[
+        history["Timestamp"] >= cutoff
+    ]
+
+    popularity = (
+        recent["MovieID"]
+        .value_counts()
+        .reindex(items, fill_value=0)
+        .to_numpy(dtype=float)
+    )
+
+    scores = np.tile(
+        popularity,
+        (len(eval_set.user_ids), 1)
+    )
+
+    return scores
+
+def most_popular_all_time(history, eval_set, items):
+    popularity = (
+        history["MovieID"]
+        .value_counts()
+        .reindex(items, fill_value=0)
+        .to_numpy(dtype=float)
+    )
+
+    scores = np.tile(
+        popularity,
+        (len(eval_set.user_ids), 1)
+    )
+
+    return scores
