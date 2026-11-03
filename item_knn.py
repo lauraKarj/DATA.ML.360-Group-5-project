@@ -12,7 +12,6 @@ From run_all.py, after the split:
 Standalone:
     python item_knn.py --data-dir ml-1m --out-dir results --fig-dir figures
 """
-import argparse
 import time
 from pathlib import Path
 
@@ -261,16 +260,3 @@ def _load_split(data_dir):
     return (ratings[ratings["Timestamp"] < t_validation],
             ratings[(ratings["Timestamp"] >= t_validation) & (ratings["Timestamp"] < t_test)],
             ratings[ratings["Timestamp"] >= t_test])
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--data-dir", default="ml-1m", help="folder containing ratings.dat")
-    parser.add_argument("--out-dir", default="results", help="where the CSV results are written")
-    parser.add_argument("--fig-dir", default="figures", help="where the figures are written")
-    args = parser.parse_args()
-    run(*_load_split(args.data_dir), out_dir=args.out_dir, fig_dir=args.fig_dir)
-
-
-if __name__ == "__main__":
-    main()
