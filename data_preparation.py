@@ -45,12 +45,15 @@ def load_data(data_dir="ml-1m"):
 
     return df_movies, df_ratings, df_users
 
-def characterize_and_plot(df_movies, df_ratings, df_users, fig_dir="figures"):
-    """Characterizes the data and plots distributions from it"""
+def run_preparation(df_movies, df_ratings, df_users, fig_dir="figures"):
+    """
+    Characterizes the data and plots distributions from it
+    Filters data for the analysis and check duplicates, thresholds and scales.
+    """
 
     # The data loaded and characterized: users, items, interactions, density;
-    users = len(set(df_users['UserID'].dropna())) # filter out just in case dublicated and nulls
-    movies = len(set(df_movies['MovieID'].dropna())) # filter out just in case dublicated and nulls
+    users = len(set(df_users['UserID'].dropna())) # filter out just in case duplicated and nulls
+    movies = len(set(df_movies['MovieID'].dropna())) # filter out just in case duplicated and nulls
     ratings = len(df_ratings)
     users_ratingDf = df_ratings["UserID"].nunique()
     movies_ratingDf = df_ratings["MovieID"].nunique()
@@ -104,7 +107,7 @@ def characterize_and_plot(df_movies, df_ratings, df_users, fig_dir="figures"):
     # the time span and how activity is distributed across it.
     timestamps = pd.to_datetime(df_ratings['Timestamp'], unit='s')
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 6))
     ax1.hist(timestamps.tolist(), bins=500, color='red')
     ax1.set_xlabel("Date")
     ax1.set_ylabel("Number of ratings")
@@ -119,10 +122,6 @@ def characterize_and_plot(df_movies, df_ratings, df_users, fig_dir="figures"):
     plt.tight_layout()
     plt.savefig(fig_dir / "time_activity_distribution.png", dpi=300)
     plt.close()
-
-
-def filter_and_split(df_ratings):
-    """First filter data for the analysis and check dublicates, thresholds and scales."""
 
     # Check that all ratings are on scale 1 to 5
     rating_scale = df_ratings["Rating"]
@@ -155,9 +154,9 @@ def filter_and_split(df_ratings):
 
     # Exact timestamps computed by changing manually cutoff_date and looking how
     # rating counts and percentages act -> 70%, 20%, 10% found
-    trainDate = "2000-11-22"
+    train_date = "2000-11-22"
     split70 = "2000-11-23"
-    validationDate = "2000-12-31"
+    validation_date = "2000-12-31"
     split90 = "2001-01-01"
     cutoff_date = split70
     cutoff_timestamp = pd.Timestamp(cutoff_date).timestamp()
@@ -182,10 +181,10 @@ def filter_and_split(df_ratings):
     #print(f"Percentage of users before cutoff: {user_percentage:.2f}%")
 
     # split into train 70% / validation 20% / test 10%
-    cutoff_dateTrain = "2000-11-23"
-    cutoff_dateTest = "2001-01-01"
-    cutoff_train = pd.Timestamp(cutoff_dateTrain).timestamp()
-    cutoff_test = pd.Timestamp(cutoff_dateTest).timestamp()
+    cutoff_datetrain = "2000-11-23"
+    cutoff_datetest = "2001-01-01"
+    cutoff_train = pd.Timestamp(cutoff_datetrain).timestamp()
+    cutoff_test = pd.Timestamp(cutoff_datetest).timestamp()
 
     training_set = ratings_df[ratings_df["Timestamp"] < cutoff_train]
     print("Rows in training set", len(training_set))
