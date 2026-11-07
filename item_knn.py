@@ -20,15 +20,17 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from evaluation import (RELEVANCE_THRESHOLD, TOP_N, catalogue_index, check_against_sklearn,
-                        evaluate, evaluation_set, interaction_matrix, paired_bootstrap)
+import most_popular
+from evaluation import (TOP_N, catalogue_index, check_against_sklearn, evaluate, evaluation_set,
+                        interaction_matrix, paired_bootstrap)
 
 K_GRID = [5, 10, 20, 50, 100, 200, 400, 800, None]
 SIMILARITIES = {
     "implicit": ["cosine", "jaccard"],
     "explicit": ["cosine", "adjusted_cosine", "pearson", "jaccard"],
 }
-POPULARITY_VARIANTS = {"MostPop-all": False, "MostPop-positive": True}
+POPULARITY_MODELS = {"MostPop-all_time": most_popular.all_time_scores,
+                     "MostPop-temporal": most_popular.temporal_scores}
 METRIC = f"ndcg@{TOP_N}"
 
 
@@ -91,22 +93,14 @@ def knn_scores(W, S_k):
     return W @ S_k.T
 
 
-def popularity_scores(history, items, positive_only, n_users):
-    """All-time Most Popular scores, the comparison point for kNN until the team's
-    Most Popular module is in the repo."""
-    df = history[history["Rating"] >= RELEVANCE_THRESHOLD] if positive_only else history
-    counts = df["MovieID"].value_counts().reindex(items, fill_value=0).to_numpy(np.float64)
-    return np.tile(counts, (n_users, 1))
-
-
 def run_period(history, heldout, users, items, configs):
-    """Evaluate the popularity variants and the given kNN configurations on one held-out period.
-    Returns the summary table, the per-user metrics and the top-n lists of every model."""
+    """Evaluate the Most Popular variants (most_popular.py) and the given kNN configurations on
+    one held-out period. Returns the summary table, the per-user metrics and the top-n lists."""
     eval_set = evaluation_set(history, heldout, users, items)
     summary, per_user, tops = [], {}, {}
 
-    for name, positive_only in POPULARITY_VARIANTS.items():
-        scores = popularity_scores(history, items, positive_only, len(eval_set.rows))
+    for name, popularity in POPULARITY_MODELS.items():
+        scores = popularity(history, items, len(eval_set.rows))
         row, per_user[name], tops[name] = evaluate(scores, eval_set)
         summary.append({"model": name, **row})
 
@@ -164,10 +158,8 @@ def plot_k_sweep(grid, popularity, n_items, path):
         x = [n_items if k == "all" else k for k in g["k"]]
         ax.plot(x, g[METRIC], marker="o", label=f"{measure} ({feedback})",
                 linestyle="-" if feedback == "implicit" else "--")
-    for name, value in popularity.items():
-        ax.axhline(value, color="grey", linestyle=":", linewidth=1)
-        ax.annotate(name, (K_GRID[0], value), textcoords="offset points", xytext=(0, 3),
-                    fontsize=8, color="grey")
+    for (name, value), style in zip(popularity.items(), [":", "-."]):
+        ax.axhline(value, color="grey", linestyle=style, linewidth=1.2, label=name)
     ax.set_xscale("log")
     ax.set_xticks([k for k in K_GRID if k is not None] + [n_items])
     ax.set_xticklabels([str(k) for k in K_GRID[:-1]] + ["all"])
