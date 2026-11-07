@@ -1,0 +1,4 @@
+metric,max_abs_diff,n_users
+precision,0.0,200
+recall,0.0,200
+ndcg,2.220446049250313e-16,200
