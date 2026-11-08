@@ -34,7 +34,7 @@ Instructions for data set up:
 
 1. Click https://files.grouplens.org/datasets/movielens/ml-1m.zip which will download the data.
 2. Unzip the loaded forder.
-3. Open the folder, copy three datasets inside it and paste those in project folder c1m/
+3. Open the folder, copy three datasets inside it and paste those in project folder ml-1m/
 4. Now the project forder ml-1m/ structure should look like following:
     ```
     DATA.ML.360-GROUP-5-project
