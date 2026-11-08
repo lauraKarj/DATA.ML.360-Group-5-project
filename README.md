@@ -2,6 +2,7 @@
 Recommender Systems project work for the course of Tampere University course DATA.ML.360
 
 Team of creators, Group 5: Laura Karjalainen, Tommi Lamberg and Kush Aswani
+
 Part 1 report and results can be found in the Repository: report/part-1/
 
 # Requirements
