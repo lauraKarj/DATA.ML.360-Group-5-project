@@ -135,7 +135,7 @@ def run_period(
     )
 
 
-def run(
+def run_mostpop(
     train,
     validation,
     test,
@@ -161,6 +161,7 @@ def run(
     )
 
     print(
+        "\n\nNext running results for most popular baselines...\n",
         f"Catalogue contains "
         f"{len(users)} users and "
         f"{len(items)} movies"
@@ -246,83 +247,3 @@ def run(
         f"Test users evaluated: "
         f"{test_set.n_cold} cold users excluded"
     )
-
-
-def _load_split(data_dir):
-    """
-    Same split as item_knn.py.
-    """
-
-    ratings = pd.read_csv(
-        Path(data_dir) / "ratings.dat",
-        sep="::",
-        engine="python",
-        header=None,
-        names=[
-            "UserID",
-            "MovieID",
-            "Rating",
-            "Timestamp",
-        ],
-        encoding="latin-1",
-    )
-
-    counts = ratings["MovieID"].value_counts()
-
-    ratings = ratings[
-        ratings["MovieID"].isin(
-            counts[counts >= 5].index
-        )
-    ]
-
-    t_validation = pd.Timestamp(
-        "2000-11-23"
-    ).timestamp()
-
-    t_test = pd.Timestamp(
-        "2001-01-01"
-    ).timestamp()
-
-    train = ratings[
-        ratings["Timestamp"] < t_validation
-    ]
-
-    validation = ratings[
-        (ratings["Timestamp"] >= t_validation)
-        &
-        (ratings["Timestamp"] < t_test)
-    ]
-
-    test = ratings[
-        ratings["Timestamp"] >= t_test
-    ]
-
-    return train, validation, test
-
-
-def main():
-
-    parser = argparse.ArgumentParser(
-        description="Most Popular baselines"
-    )
-
-    parser.add_argument(
-        "--data-dir",
-        default="ml-1m",
-    )
-
-    parser.add_argument(
-        "--out-dir",
-        default="results",
-    )
-
-    args = parser.parse_args()
-
-    run(
-        *_load_split(args.data_dir),
-        out_dir=args.out_dir,
-    )
-
-
-if __name__ == "__main__":
-    main()
