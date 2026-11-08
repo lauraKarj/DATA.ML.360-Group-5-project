@@ -50,7 +50,7 @@ def run_preparation(df_movies, df_ratings, df_users, fig_dir="figures"):
     Characterizes the data and plots distributions from it
     Filters data for the analysis and check duplicates, thresholds and scales.
     """
-
+    print("Data characterization running...")
     # The data loaded and characterized: users, items, interactions, density;
     users = len(set(df_users['UserID'].dropna())) # filter out just in case duplicated and nulls
     movies = len(set(df_movies['MovieID'].dropna())) # filter out just in case duplicated and nulls
@@ -72,25 +72,24 @@ def run_preparation(df_movies, df_ratings, df_users, fig_dir="figures"):
     fig_dir.mkdir(parents=True, exist_ok=True)
 
     # Long-tail distribution of ratings per user
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+
     interactions_users = df_ratings["UserID"].value_counts().sort_values(ascending=False)
-    plt.figure(figsize=(12, 5))
-    plt.hist(interactions_users, bins=200)
-    plt.xlabel("Users")
-    plt.ylabel("Number of ratings")
-    plt.title("Long-tail distribution of ratings per user")
-    plt.tight_layout()
-    plt.savefig(fig_dir / "ratings_per_user.png", dpi=150)
-    plt.close()
+    print("Maximum ratings per user:", interactions_users.max())
+    ax1.hist(interactions_users, bins=100)
+    ax1.set_xlabel("Number of ratings per user")
+    ax1.set_ylabel("Number of users")
+    ax1.set_title("Long-tail distribution of ratings per user")
 
     # Long-tail distribution of ratings per movie
     interactions_movies = df_ratings["MovieID"].value_counts().sort_values(ascending=False)
-    plt.figure(figsize=(12, 5))
-    plt.hist(interactions_movies, bins=200)
-    plt.xlabel("Movies")
-    plt.ylabel("Number of ratings")
-    plt.title("Long-tail distribution of ratings per movie")
+    print("Maximum ratings per movie:", interactions_movies.max())
+    ax2.hist(interactions_movies, bins=100)
+    ax2.set_xlabel("Number of ratings per movie")
+    ax2.set_ylabel("Number of movies")
+    ax2.set_title("Long-tail distribution of ratings per movie")
     plt.tight_layout()
-    plt.savefig(fig_dir / "ratings_per_movie.png", dpi=150)
+    plt.savefig(fig_dir / "ratings_per_user_movie.png", dpi=150)
     plt.close()
 
     # the rating distribution;
@@ -107,7 +106,7 @@ def run_preparation(df_movies, df_ratings, df_users, fig_dir="figures"):
     # the time span and how activity is distributed across it.
     timestamps = pd.to_datetime(df_ratings['Timestamp'], unit='s')
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 6))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
     ax1.hist(timestamps.tolist(), bins=500, color='red')
     ax1.set_xlabel("Date")
     ax1.set_ylabel("Number of ratings")
@@ -133,6 +132,9 @@ def run_preparation(df_movies, df_ratings, df_users, fig_dir="figures"):
         print("True: All users have at least 20 rating.")
     else:
         print("False: Some users have under 20 ratings.")
+
+    print("\nPlots added to figures/")
+    print("Filtering starting...")
 
     # Filter out movies with less than 5 ratings
     movie_counts = df_ratings["MovieID"].value_counts()

@@ -2,5 +2,3 @@ __pycache__/
 .idea/
 .venv/
 /ml-1m
-/figures
-/results
