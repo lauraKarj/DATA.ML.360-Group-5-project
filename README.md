@@ -27,17 +27,17 @@ Dataset used for the project is MovieLens 1M by GroupLens.
 Data is available in https://grouplens.org/datasets/movielens/1m/
 
 For the project, data isn't included in the project folder and it should be retrieved before running the project.
-That is due to GroupLens and dataset's licence (from ml-m1/README). 
+That is due to GroupLens and dataset's licence (from ml-1m/README). 
 Instructions for data set up:
 
 1. Click https://files.grouplens.org/datasets/movielens/ml-1m.zip which will download the data.
 2. Unzip the loaded forder.
-3. Open the folder, copy three datasets inside it and paste those in project folder ml-m1/
-4. Now the project forder ml-m1/ structure should look like following:
+3. Open the folder, copy three datasets inside it and paste those in project folder c1m/
+4. Now the project forder ml-1m/ structure should look like following:
     ```
     DATA.ML.360-GROUP-5-project
     ├── figures/
-    ├── ml-m1/
+    ├── ml-1m/
     │   └── movies.dat
     │   └── ratings.dat
     │   └── README
@@ -108,7 +108,7 @@ The script automatically (Part 1):
 ```
 DATA.ML.360-GROUP-5-project
 ├── figures/ # Plots saved as png files
-├── ml-m1/   # Data used
+├── ml-1m/   # Data used
 ├── results/ # Results saved as CSV files
 │
 ├── .gitignore 
