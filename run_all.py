@@ -2,6 +2,9 @@
 Run_all.py document which runs the whole project
 """
 
+# mult_dae must be imported first so that torch loads before pandas: on Windows, pandas 2.2 bundles an
+# older msvcp140.dll, and torch then fails with "WinError 1114 ... c10.dll"
+import mult_dae
 import argparse
 from item_knn import (run, _load_split)
 from data_preparation import (load_data, run_preparation)
@@ -22,6 +25,8 @@ def main():
     run(*_load_split(args.data_dir), out_dir=args.out_dir, fig_dir=args.fig_dir)
     # Run most_popular and evaluation
     run_mostpop(*_load_split(args.data_dir),out_dir=args.out_dir,)
+    # Part 2: run Mult-DAE (self-implemented) and compare it with item-kNN and Most Popular
+    mult_dae.run(*_load_split(args.data_dir), out_dir=args.out_dir, fig_dir=args.fig_dir)
 
 if __name__ == "__main__":
     main()

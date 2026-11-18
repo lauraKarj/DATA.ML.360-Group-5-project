@@ -103,8 +103,13 @@ The script automatically (Part 1):
 - Performs data preparation and generates distribution plots.
 - Runs the Item-KNN model and evaluation.
 - Runs the Most Popular model and evaluation.
-- Saves CSV results in the results directory.
-- Saves generated figures in the figures directory.
+
+Part 2:
+- Runs the self-implemented Mult-DAE model (PyTorch): tuning on validation, test evaluation with five seeds, and comparison with item-kNN and Most Popular. This takes about 7 minutes on a laptop CPU.
+
+Both parts:
+- Save CSV results in the results directory.
+- Save generated figures in the figures directory.
 
 # Structure
 ```
@@ -118,6 +123,7 @@ DATA.ML.360-GROUP-5-project
 ├── evaluation.py
 ├── item_knn.py
 ├── most_popular.py
+├── mult_dae.py # Part 2 self-implemented model
 ├── README.md 
 ├── requirements.txt # Includes requirements
 └── run_all.py # File that runs the whole project
