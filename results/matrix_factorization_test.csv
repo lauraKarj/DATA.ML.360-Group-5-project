@@ -1,0 +1,2 @@
+model,factors,reg,iterations,precision@10,recall@10,ndcg@10,coverage,mean_rec_popularity,n_users,n_cold_users_excluded
+ALS,32,0.001,50,0.17443478260869566,0.059750826533430036,0.19476564396985485,0.2716627634660422,1318.284956521739,1150,6
