@@ -1,4 +1,6 @@
 __pycache__/
 .idea/
 .venv/
-/ml-1m
+/ml-1m/movies.dat
+/ml-1m/ratings.dat
+/ml-1m/users.dat
