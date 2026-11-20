@@ -30,7 +30,7 @@ SEED = 42
 # Search space
 #
 
-year_weights = [0.0, 0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0]
+year_weights = [0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0]
 norm_options = [False, True] # l2 true or false
 
 def matrix_parser(df_movies, items):
