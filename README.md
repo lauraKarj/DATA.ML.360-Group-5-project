@@ -106,6 +106,7 @@ The script automatically (Part 1):
 
 Part 2:
 - Runs the self-implemented Mult-DAE model (PyTorch): tuning on validation, test evaluation with five seeds, and comparison with item-kNN and Most Popular. This takes about 7 minutes on a laptop CPU.
+- Runs the Mult-DAE disaggregated analysis (user activity, head vs long-tail movies) and the sparsity ablation (50% and 20% of the training ratings, three draws each).
 
 Both parts:
 - Save CSV results in the results directory.
@@ -124,6 +125,7 @@ DATA.ML.360-GROUP-5-project
 ├── item_knn.py
 ├── most_popular.py
 ├── mult_dae.py # Part 2 self-implemented model
+├── mult_dae_analysis.py # Part 2 disaggregation and sparsity ablation for Mult-DAE
 ├── README.md 
 ├── requirements.txt # Includes requirements
 └── run_all.py # File that runs the whole project
