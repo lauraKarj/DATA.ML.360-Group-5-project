@@ -103,8 +103,17 @@ The script automatically (Part 1):
 - Performs data preparation and generates distribution plots.
 - Runs the Item-KNN model and evaluation.
 - Runs the Most Popular model and evaluation.
-- Saves CSV results in the results directory.
-- Saves generated figures in the figures directory.
+
+Part 2:
+
+Runs the self-implemented Mult-DAE model (PyTorch): tuning on validation, test evaluation with five seeds, and comparison with item-kNN and Most Popular. This takes about 7 minutes on a laptop CPU.
+Runs the Mult-DAE disaggregated analysis (user activity, head vs long-tail movies) and the sparsity ablation (50% and 20% of the training ratings, three draws each).
+Runs the Matrix Factorization (ALS) model: tuning on validation and test evaluation with five seeds as well as the disaggregated analysis (user activity & timestamps) as well sparsity ablation on 50% and 20% rating data with random subsampling
+
+Both parts:
+
+Save CSV results in the results directory.
+Save generated figures in the figures directory.
 
 # Structure
 ```
