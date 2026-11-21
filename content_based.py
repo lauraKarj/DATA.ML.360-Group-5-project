@@ -2,7 +2,7 @@
 Content-based: profile matching over genre and release-year metadata
 Part 2 model
 
-    1. Creates implicit user profile matrices (threshold 4),
+    1. Creates implicit user matrices (threshold 4),
        parse genre and year matrices
     3. Form evaluation set
     4. Tune hyperparameters and rank best combos
@@ -20,7 +20,8 @@ from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, normalize
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from data_preparation import load_data
-from evaluation import evaluation_set, catalogue_index, interaction_matrix, evaluate, TOP_N
+from evaluation import (evaluation_set, catalogue_index, interaction_matrix,
+                        evaluate, TOP_N, N_BOOTSTRAP)
 from item_knn import _load_split
 
 METRIC = f"ndcg@{TOP_N}"
@@ -30,8 +31,8 @@ SEED = 42
 # Search space
 #
 
-year_weights = [0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0]
-norm_options = [False, True] # l2 true or false
+year_weights = [0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0]
+l2_options = [False, True] # l2 true or false
 
 def matrix_parser(df_movies, items):
     df_movies = df_movies.copy()
@@ -82,7 +83,7 @@ def build_feature_matrix(genre_mat, years, year_weight=1.0, l2_norm_items=False)
     Builds feature matrix from genres and release-year metadata.
     Genre is always 1.0 weight and year weight is tuned.
 
-    If l2 normalization is done, movies with more genres doesn't
+    If l2 normalization is done, movies with more genres in multi-hot doesn't
     get greater weight than movies with only a 1 genre.
     """
     if l2_norm_items:
@@ -96,11 +97,9 @@ def build_feature_matrix(genre_mat, years, year_weight=1.0, l2_norm_items=False)
 def validate_model(feature_matrix, user_matrix, eval_set):
     """
     Uses cosine similarity to evaluate model performance.
-    l2 normalization done also for user profiles
     """
-    # Create and normalize user profiles
+    # Create user profiles
     user_profiles = user_matrix @ feature_matrix
-    user_profiles = normalize(user_profiles, norm='l2')
 
     scores = cosine_similarity(
         user_profiles[eval_set.rows],
@@ -118,19 +117,18 @@ def tune_hyperparameters( genre_variants, year_variants,
     """
     Tunes hyperparameters to find the best model:
     genres: multi-hot or tfidf.
-    l2 normalization for genre: true or false.
+    l2 normalization for multi-hot: true or false.
     years: minmax or decade_onehot scaling.
     Best weight for year
     """
     print('Tuning hyperparameters...')
     results = []
     for genre_enc, genre_mat in genre_variants.items():
-        for l2_norm in norm_options:
+        for l2_norm in l2_options:
+            if genre_enc == "tfidf" and l2_norm:
+                continue
             for y_scale, y_mat in year_variants.items():
                 for yw in year_weights:
-
-                    if yw == 0.0 and y_scale != 'minmax':
-                        continue # year doesn't affect
 
                     feature_matrix = build_feature_matrix(
                         genre_mat, y_mat, year_weight=yw, l2_norm_items=l2_norm
@@ -143,7 +141,7 @@ def tune_hyperparameters( genre_variants, year_variants,
                     results.append({
                         "genre_encoding": genre_enc,
                         "l2_genres": l2_norm,
-                        "year_scale": y_scale if yw > 0 else "none",
+                        "year_scale": y_scale,
                         "year_weight": yw,
                         **summary
                     })
@@ -154,23 +152,65 @@ def tune_hyperparameters( genre_variants, year_variants,
     return results_df
 
 
+def run_contentsparsity(train, validation, test, best_model_features, out_dir="results"):
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    users, items = catalogue_index(train, validation, test)
+
+    print("\n\nCalculating next evaluated model at 100%, 50%, and 20% of the training interactions...")
+    sparsityresults = []
+    interactions = [0.2,0.5,1.0] # 20%, 50% and 100% of all train interactions
+    seeds = [42,43,44]
+    for i in interactions:
+        for seed in seeds:
+            trainsample = train.sample(frac=i, random_state=seed) # new train sets
+            history = pd.concat([trainsample, validation])
+            user_matrix_val = interaction_matrix(history, users, items, feedback='implicit')
+
+            # Form new evaluation set and validate model with updated train data
+            eval_test = evaluation_set(history=history, heldout=test, users=users, items=items)
+            test_summary, _, _ = validate_model(best_model_features, user_matrix_val, eval_test)
+
+            sparsityresults.append({
+                "training interactions": f"{i * 100:.0f}%",
+                "seed": seed,
+                **test_summary
+            })
+
+    sparsityresults_df = pd.DataFrame(sparsityresults)
+
+    # calculate means (3 seeds used)
+    sparsity_means = (
+        sparsityresults_df
+        .groupby("training interactions", sort=False)
+        .mean(numeric_only=True)
+        .drop(columns=["seed"])
+        .reset_index()
+    )
+    sparsity_means.to_csv(out_dir / "content_based_sparsity.csv", index=False)
+    print('Results saved to "content_based_sparsity.csv".')
+    print("Results:")
+    print(pd.DataFrame(sparsity_means).to_string(index=False))
+
+
 def run_contentbased(train, validation, test, df_movies, out_dir="results"):
     """
-    1. creates implicit user profile matrices
+    1. creates implicit user matrices
     2. parses genre and year matrices
     3. Forms evaluation set
     4. tunes hyperparameters and finds the 5 best combos
     5. fits model with tuned hyperparameters to test data
+    6. runs content sparsity and disaggregated parts
     """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     users, items = catalogue_index(train, validation, test)
 
-    # Implicit user profile matrix for training
+    # Implicit user matrix for training
     user_matrix_train = interaction_matrix(train, users, items, feedback='implicit')
 
-    # Implicit user profile matrix for validation
+    # Implicit user matrix for validation
     history = pd.concat([train, validation])
     user_matrix_val = interaction_matrix(history, users, items, feedback='implicit')
 
@@ -186,7 +226,7 @@ def run_contentbased(train, validation, test, df_movies, out_dir="results"):
     print('\nFitting model with tuned hyperparameters...')
     bestModel = results_df.iloc[0] # Take first row
     tuned_genre_matrix = genre_variants[bestModel["genre_encoding"]]
-    tuned_y_scale = "minmax" if bestModel["year_scale"] == "none" else bestModel["year_scale"]
+    tuned_y_scale = bestModel["year_scale"]
     tuned_year_matrix = year_variants[tuned_y_scale]
 
     best_features = build_feature_matrix(
@@ -197,15 +237,26 @@ def run_contentbased(train, validation, test, df_movies, out_dir="results"):
 
     # model with test data after tuning
     eval_test = evaluation_set(history=history, heldout=test, users=users, items=items)
-    test_summary, _, _ = validate_model(best_features, user_matrix_val, eval_test)
+    test_summary, per_user, _ = validate_model(best_features, user_matrix_val, eval_test)
+
+    # 95% CI for NDCG by generating N_BOOTSTRAP samples
+    ndcg_scores = per_user["ndcg"]
+    rng = np.random.default_rng(SEED)
+    boot = np.array([
+        rng.choice(ndcg_scores, size=len(ndcg_scores), replace=True).mean()
+        for _ in range(N_BOOTSTRAP)
+    ])
+    ci_lower, ci_upper = np.percentile(boot, [2.5, 97.5])
 
     test_result = []
     test_result.append({
         "genre_encoding": bestModel["genre_encoding"],
         "l2_genres": bestModel["l2_genres"],
-        "year_scale": tuned_y_scale if bestModel["year_weight"] > 0 else "none",
+        "year_scale": tuned_y_scale,
         "year_weight": bestModel["year_weight"],
-        **test_summary
+        **test_summary,
+        "CI_lower NDCG": ci_lower,
+        "CI_upper NDCG": ci_upper
     })
 
     pd.DataFrame(test_result).to_csv(out_dir / "content_based_test.csv", index=False)
@@ -213,6 +264,7 @@ def run_contentbased(train, validation, test, df_movies, out_dir="results"):
     print("Final model:")
     print(pd.DataFrame(test_result).to_string(index=False))
 
+    run_contentsparsity(train, validation, test, best_features, out_dir)
 
 
 def main():
@@ -224,10 +276,7 @@ def main():
 
     # Load df
     df_movies, df_ratings, df_users = load_data(args.data_dir)
-    run_contentbased(*_load_split(args.data_dir), df_movies, out_dir=args.out_dir,)
-
+    run_contentbased(*_load_split(args.data_dir), df_movies, out_dir=args.out_dir)
 
 if __name__ == "__main__":
     main()
-
-

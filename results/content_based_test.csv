@@ -1,2 +1,2 @@
-genre_encoding,l2_genres,year_scale,year_weight,precision@10,recall@10,ndcg@10,coverage,mean_rec_popularity,n_users,n_cold_users_excluded
-multi-hot,False,minmax,2.0,0.0391304347826087,0.02062010543650491,0.04546235944661975,0.2306791569086651,164.958,1150,6
+genre_encoding,l2_genres,year_scale,year_weight,precision@10,recall@10,ndcg@10,coverage,mean_rec_popularity,n_users,n_cold_users_excluded,CI_lower NDCG,CI_upper NDCG
+multi-hot,False,minmax,2.0,0.0391304347826087,0.02062010543650491,0.04546235944661975,0.2306791569086651,165.00782608695653,1150,6,0.04037115458742626,0.05117878642865915
