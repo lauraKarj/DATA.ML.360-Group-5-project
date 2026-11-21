@@ -1,2 +1,2 @@
-model,factors,reg,iterations,precision@10,recall@10,ndcg@10,coverage,mean_rec_popularity,n_users,n_cold_users_excluded
-ALS,32,0.001,50,0.17443478260869566,0.059750826533430036,0.19476564396985485,0.2716627634660422,1318.284956521739,1150,6
+model,factors,reg,iterations,precision@10_mean,precision@10_ci_half_width,recall@10_mean,recall@10_ci_half_width,ndcg@10_mean,ndcg@10_ci_half_width,coverage_mean,coverage_ci_half_width
+ALS,32,0.001,50,0.17497391304347829,0.0005473596893172858,0.05913844976257241,0.0008464100758763378,0.1941614202279113,0.0006617705908531622,0.27160421545667446,0.0014629980062517594
