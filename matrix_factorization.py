@@ -21,6 +21,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
+from scipy import stats
 
 from implicit.als import AlternatingLeastSquares
 
@@ -33,8 +34,8 @@ from evaluation import (
 
 METRIC = f"ndcg@{TOP_N}"
 
+TEST_SEEDS = [42, 43, 44, 45, 46]
 SEED = 42
-
 #
 # Search space
 #
@@ -80,7 +81,7 @@ def build_interaction_matrix(history, users, items):
 
 
 def train_model(history, users, items,
-                factors, reg, iterations):
+                factors, reg, iterations,seed):
 
     matrix = build_interaction_matrix(
         history,
@@ -97,7 +98,7 @@ def train_model(history, users, items,
         factors=factors,
         regularization=reg,
         iterations=iterations,
-        random_state=SEED,
+        random_state=seed,
     )
 
     model.fit(item_user)
@@ -136,7 +137,7 @@ def score_matrix(model, eval_set, items):
 
 
 def run_period(history, heldout, users, items,
-               factors, reg, iterations):
+               factors, reg, iterations,seed=SEED):
 
     model = train_model(
         history,
@@ -145,6 +146,7 @@ def run_period(history, heldout, users, items,
         factors=factors,
         reg=reg,
         iterations=iterations,
+        seed=seed,
     )
 
     eval_set = evaluation_set(
@@ -167,6 +169,102 @@ def run_period(history, heldout, users, items,
 
     return summary, per_user, top, eval_set
 
+def split_test_period(test):
+
+    split_time = test["Timestamp"].median()
+
+    early_test = test[
+        test["Timestamp"] <= split_time
+    ]
+
+    late_test = test[
+        test["Timestamp"] > split_time
+    ]
+
+    return early_test, late_test
+
+def sparsity_ablation(
+        train,
+        validation,
+        test,
+        users,
+        items,
+        factors,
+        reg,
+        iterations):
+
+    rows = []
+
+    for frac in [1.0, 0.5, 0.2]:
+
+        sparse_train = train.sample(
+            frac=frac,
+            random_state=42
+        )
+
+        history = pd.concat(
+            [sparse_train, validation],
+            ignore_index=True
+        )
+
+        summary, _, _, _ = run_period(
+            history,
+            test,
+            users,
+            items,
+            factors=factors,
+            reg=reg,
+            iterations=iterations,
+            seed=42,
+        )
+
+        rows.append({
+            "train_fraction": frac,
+            **summary,
+        })
+
+        print(
+            f"Train fraction={frac:.1f} "
+            f"NDCG={summary[f'ndcg@{TOP_N}']:.4f}"
+        )
+
+    return pd.DataFrame(rows)
+
+def user_activity_breakdown(train, per_user):
+
+    activity = (
+        train
+        .groupby("UserID")
+        .size()
+        .rename("activity")
+    )
+
+
+    df = per_user.join(activity)
+
+    threshold = df["activity"].median()
+
+    groups = {
+        "low_activity":
+            df[df["activity"] <= threshold],
+
+        "high_activity":
+            df[df["activity"] > threshold],
+    }
+
+    rows = []
+
+    for name, group in groups.items():
+
+        rows.append({
+            "group": name,
+            "users": len(group),
+            "precision": group["precision"].mean(),
+            "recall": group["recall"].mean(),
+            "ndcg": group["ndcg"].mean(),
+        })
+
+    return pd.DataFrame(rows)
 
 def validation_search(train, validation,
                       users, items):
@@ -286,45 +384,174 @@ def run(train, validation, test,
         [train, validation],
         ignore_index=True,
     )
+    early_test, late_test = split_test_period(
+    test
+    )
 
-    summary, per_user, top, _ = run_period(
+    summary_early, _, _, _ = run_period(
+    history,
+    early_test,
+    users,
+    items,
+    factors=best_factors,
+    reg=best_reg,
+    iterations=best_iterations,
+    seed=42,
+    )
+
+    summary_late, _, _, _ = run_period(
         history,
-        test,
+        late_test,
         users,
         items,
         factors=best_factors,
         reg=best_reg,
         iterations=best_iterations,
+        seed=42,
     )
+
+    period_results = pd.DataFrame([
+    {
+        "period": "early",
+        **summary_early
+    },
+    {
+        "period": "late",
+        **summary_late
+    }
+    ])
+
+    period_results.to_csv(
+    out_dir / "matrix_factorization_early_late.csv",
+    index=False,
+    )
+
+    print("\nEarly vs Late Test Period\n")
+
+    print(
+        period_results
+        .round(4)
+        .to_string(index=False)
+    )
+
+    seed_rows = []
+
+    for seed in TEST_SEEDS:
+
+        summary, per_user, top, _ = run_period(
+            history,
+            test,
+            users,
+            items,
+            factors=best_factors,
+            reg=best_reg,
+            iterations=best_iterations,
+            seed=seed,
+        )
+
+        seed_rows.append({
+            "seed": seed,
+            **summary,
+        })
+
+    seed_results = pd.DataFrame(seed_rows)
+
+    seed_results.to_csv(
+    out_dir / "matrix_factorization_test_seeds.csv",
+    index=False,
+    )
+
+    print("\nTest Results\n")
+
+    metrics = [
+        f"precision@{TOP_N}",
+        f"recall@{TOP_N}",
+        f"ndcg@{TOP_N}",
+        "coverage",
+    ]
+
+    summary_row = {}
+
+    for metric in metrics:
+
+        mean, ci_half_width = confidence_interval(
+            seed_results[metric]
+        )
+
+        summary_row[
+            f"{metric}_mean"
+        ] = mean
+
+        summary_row[
+            f"{metric}_ci_half_width"
+        ] = ci_half_width
 
     test_results = pd.DataFrame([{
         "model": "ALS",
         "factors": best_factors,
         "reg": best_reg,
         "iterations": best_iterations,
-        **summary,
+        **summary_row,
     }])
 
     test_results.to_csv(
         out_dir / "matrix_factorization_test.csv",
         index=False,
     )
+    
 
-    print("\nTest Results\n")
+    print("\nSeed Results\n")
 
     print(
-        test_results[[
-            "model",
-            "factors",
-            "reg",
-            "iterations",
-            f"precision@{TOP_N}",
-            f"recall@{TOP_N}",
-            f"ndcg@{TOP_N}",
-            "coverage",
-        ]]
+        seed_results[
+            [
+                "seed",
+                f"precision@{TOP_N}",
+                f"recall@{TOP_N}",
+                f"ndcg@{TOP_N}",
+                "coverage",
+            ]
+        ]
         .round(4)
         .to_string(index=False)
+    )
+
+    print("\nMean ± 95% CI half-width\n")
+
+    print(
+        test_results.round(4).to_string(index=False)
+    )
+    ablation_results = sparsity_ablation(
+    train,
+    validation,
+    test,
+    users,
+    items,
+    best_factors,
+    best_reg,
+    best_iterations,
+)
+
+    ablation_results.to_csv(
+        out_dir / "matrix_factorization_sparsity.csv",
+        index=False,
+    )
+
+    print("\nSparsity Ablation\n")
+    print(
+        ablation_results
+        .round(4)
+        .to_string(index=False)
+    )
+
+    activity_results = user_activity_breakdown(
+    history,
+    per_user,
+    )
+
+    activity_results.to_csv(
+        out_dir / "matrix_factorization_user_activity.csv",
+        index=False,
     )
 
     return test_results
@@ -377,6 +604,25 @@ def _load_split(data_dir):
     ]
 
     return train, validation, test
+
+def confidence_interval(values):
+
+    values = np.asarray(values)
+
+    mean = values.mean()
+
+    t = stats.t.ppf(
+        0.975,
+        len(values) - 1
+    )
+
+    half_width = (
+        values.std(ddof=1)
+        * t
+        / np.sqrt(len(values))
+    )
+
+    return mean, half_width
 
 
 def main():
