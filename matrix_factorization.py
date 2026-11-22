@@ -322,7 +322,7 @@ def validation_search(train, validation,
     return results
 
 
-def run(train, validation, test,
+def run_matrix_factorization(train, validation, test,
         out_dir="results"):
 
     out_dir = Path(out_dir)
@@ -556,55 +556,6 @@ def run(train, validation, test,
 
     return test_results
 
-
-def _load_split(data_dir):
-
-    ratings = pd.read_csv(
-        Path(data_dir) / "ratings.dat",
-        sep="::",
-        engine="python",
-        header=None,
-        names=[
-            "UserID",
-            "MovieID",
-            "Rating",
-            "Timestamp",
-        ],
-        encoding="latin-1",
-    )
-
-    counts = ratings["MovieID"].value_counts()
-
-    ratings = ratings[
-        ratings["MovieID"].isin(
-            counts[counts >= 5].index
-        )
-    ]
-
-    t_validation = pd.Timestamp(
-        "2000-11-23"
-    ).timestamp()
-
-    t_test = pd.Timestamp(
-        "2001-01-01"
-    ).timestamp()
-
-    train = ratings[
-        ratings["Timestamp"] < t_validation
-    ]
-
-    validation = ratings[
-        (ratings["Timestamp"] >= t_validation)
-        &
-        (ratings["Timestamp"] < t_test)
-    ]
-
-    test = ratings[
-        ratings["Timestamp"] >= t_test
-    ]
-
-    return train, validation, test
-
 def confidence_interval(values):
 
     values = np.asarray(values)
@@ -623,30 +574,4 @@ def confidence_interval(values):
     )
 
     return mean, half_width
-
-
-def main():
-
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "--data-dir",
-        default="ml-1m",
-    )
-
-    parser.add_argument(
-        "--out-dir",
-        default="results",
-    )
-
-    args = parser.parse_args()
-
-    run(
-        *_load_split(args.data_dir),
-        out_dir=args.out_dir,
-    )
-
-
-if __name__ == "__main__":
-    main()
               

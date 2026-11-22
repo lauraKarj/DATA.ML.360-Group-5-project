@@ -106,27 +106,32 @@ The script automatically (Part 1):
 
 Part 2:
 
-Runs the self-implemented Mult-DAE model (PyTorch): tuning on validation, test evaluation with five seeds, and comparison with item-kNN and Most Popular. This takes about 7 minutes on a laptop CPU.
+- Runs the self-implemented Mult-DAE model (PyTorch): tuning on validation, test evaluation with five seeds, and comparison with item-kNN and Most Popular. This takes about 7 minutes on a laptop CPU.
 Runs the Mult-DAE disaggregated analysis (user activity, head vs long-tail movies) and the sparsity ablation (50% and 20% of the training ratings, three draws each).
-Runs the Matrix Factorization (ALS) model: tuning on validation and test evaluation with five seeds as well as the disaggregated analysis (user activity & timestamps) as well sparsity ablation on 50% and 20% rating data with random subsampling
+- Runs the Matrix Factorization (ALS) model: tuning on validation and test evaluation with five seeds as well as the disaggregated analysis (user activity & timestamps) as well sparsity ablation on 50% and 20% rating data with random subsampling
+- Runs the Content-based model: tuning on validation and test evaluation with 95% bootstrap CI. Runs the Content-model disaggregated analysis (user activity, test timestamps) and sparsity ablation on 50% and 20% rating data with random subsampling with 3 seeds.
 
 Both parts:
 
-Save CSV results in the results directory.
-Save generated figures in the figures directory.
+- Save CSV results in the results directory.
+- Save generated figures in the figures directory.
 
 # Structure
 ```
 DATA.ML.360-GROUP-5-project
 ├── figures/ # Plots saved as png files
-├── ml-1m/   # Data used
+├── ml-1m/   # Data , data README
 ├── results/ # Results saved as CSV files
 │
 ├── .gitignore 
+├── content_based.py # Part 2
 ├── data_preparation.py
 ├── evaluation.py
 ├── item_knn.py
+├── matrix_factorization.py # Part 2
 ├── most_popular.py
+├── mult_dae.py # Part 2 self-implemented model
+├── mult_dae_analysis.py # Part 2 disaggregation and sparsity ablation for Mult-DAE
 ├── README.md 
 ├── requirements.txt # Includes requirements
 └── run_all.py # File that runs the whole project

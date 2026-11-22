@@ -2,10 +2,16 @@
 Run_all.py document which runs the whole project
 """
 
+# mult_dae must be imported first so that torch loads before pandas: on Windows, pandas 2.2 bundles an
+# older msvcp140.dll, and torch then fails with "WinError 1114 ... c10.dll"
+import mult_dae
+import mult_dae_analysis
 import argparse
 from item_knn import (run, _load_split)
 from data_preparation import (load_data, run_preparation)
 from most_popular import (run_mostpop)
+from content_based import run_contentbased
+from matrix_factorization import run_matrix_factorization
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -22,6 +28,14 @@ def main():
     run(*_load_split(args.data_dir), out_dir=args.out_dir, fig_dir=args.fig_dir)
     # Run most_popular and evaluation
     run_mostpop(*_load_split(args.data_dir),out_dir=args.out_dir,)
+    # Part 2: run Mult-DAE (self-implemented) and compare it with item-kNN and Most Popular
+    mult_dae.run(*_load_split(args.data_dir), out_dir=args.out_dir, fig_dir=args.fig_dir)
+    # Part 2: Mult-DAE disaggregated analysis and sparsity ablation (needs the mult_dae.run results)
+    mult_dae_analysis.run(*_load_split(args.data_dir), out_dir=args.out_dir)
+    # Part 2: Matrix factorization
+    run_matrix_factorization(*_load_split(args.data_dir),out_dir=args.out_dir)
+    # Part 2: Run content-based model and its disaggregated analysis and sparsity ablation
+    run_contentbased(*_load_split(args.data_dir), df_movies, out_dir=args.out_dir)
 
 if __name__ == "__main__":
     main()

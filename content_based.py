@@ -12,17 +12,14 @@ Part 2 model
 Ranking and metrics come from evaluation.py.
 """
 
-import argparse
 import pandas as pd
 import numpy as np
 from pathlib import Path
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, normalize
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-from data_preparation import load_data
 from evaluation import (evaluation_set, catalogue_index, interaction_matrix,
                         evaluate, TOP_N, N_BOOTSTRAP)
-from item_knn import _load_split
 from matrix_factorization import user_activity_breakdown
 
 METRIC = f"ndcg@{TOP_N}"
@@ -250,7 +247,7 @@ def run_contentbased(train, validation, test, df_movies, out_dir="results"):
     3. Forms evaluation set
     4. tunes hyperparameters and finds the 5 best combos
     5. fits model with tuned hyperparameters to test data
-    6. runs content sparsity and disaggregated parts
+    6. runs content-based sparsity and disaggregated analysis
     """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -313,17 +310,3 @@ def run_contentbased(train, validation, test, df_movies, out_dir="results"):
     test_period_results = test_period_breakdown(history, test, users, items, best_features)
     test_period_results.to_csv(out_dir / "content_based_early_late.csv", index=False)
     print('Results saved to "content_based_early_late.csv".')
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--data-dir", default="ml-1m", help="folder containing ratings.dat")
-    parser.add_argument("--out-dir", default="results", help="where the CSV results are written")
-    parser.add_argument("--fig-dir", default="figures", help="where the figures are written")
-    args = parser.parse_args()
-
-    # Load df
-    df_movies, df_ratings, df_users = load_data(args.data_dir)
-    run_contentbased(*_load_split(args.data_dir), df_movies, out_dir=args.out_dir)
-
-if __name__ == "__main__":
-    main()
