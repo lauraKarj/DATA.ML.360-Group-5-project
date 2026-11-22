@@ -23,6 +23,7 @@ from data_preparation import load_data
 from evaluation import (evaluation_set, catalogue_index, interaction_matrix,
                         evaluate, TOP_N, N_BOOTSTRAP)
 from item_knn import _load_split
+from matrix_factorization import user_activity_breakdown
 
 METRIC = f"ndcg@{TOP_N}"
 SEED = 42
@@ -33,6 +34,9 @@ SEED = 42
 
 year_weights = [0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0]
 l2_options = [False, True] # l2 true or false
+# Sparsity analysis
+interactions = [0.2, 0.5, 1.0]  # 20%, 50% and 100% of all train interactions
+seeds = [42, 43, 44]
 
 def matrix_parser(df_movies, items):
     df_movies = df_movies.copy()
@@ -151,16 +155,27 @@ def tune_hyperparameters( genre_variants, year_variants,
     print('Results saved to "content_based_validation.csv".')
     return results_df
 
+def CI_95(per_user):
+    """95% CI for NDCG by generating N_BOOTSTRAP samples"""
+    ndcg_scores = per_user["ndcg"]
+    rng = np.random.default_rng(SEED)
 
-def run_contentsparsity(train, validation, test, best_model_features, out_dir="results"):
+    boot = np.array([
+        rng.choice(ndcg_scores, size=len(ndcg_scores), replace=True).mean()
+        for _ in range(N_BOOTSTRAP)
+    ])
+
+    ci_lower, ci_upper = np.percentile(boot, [2.5, 97.5])
+    return ci_lower, ci_upper
+
+
+def content_sparsity(train, validation, test, best_model_features, out_dir="results"):
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     users, items = catalogue_index(train, validation, test)
 
     print("\n\nCalculating next evaluated model at 100%, 50%, and 20% of the training interactions...")
     sparsityresults = []
-    interactions = [0.2,0.5,1.0] # 20%, 50% and 100% of all train interactions
-    seeds = [42,43,44]
     for i in interactions:
         for seed in seeds:
             trainsample = train.sample(frac=i, random_state=seed) # new train sets
@@ -180,18 +195,53 @@ def run_contentsparsity(train, validation, test, best_model_features, out_dir="r
     sparsityresults_df = pd.DataFrame(sparsityresults)
 
     # calculate means (3 seeds used)
-    sparsity_means = (
-        sparsityresults_df
-        .groupby("training interactions", sort=False)
-        .mean(numeric_only=True)
-        .drop(columns=["seed"])
-        .reset_index()
+    sparsity_means = ( sparsityresults_df.groupby("training interactions", sort=False)
+        .mean(numeric_only=True).drop(columns=["seed"]).reset_index()
     )
+
     sparsity_means.to_csv(out_dir / "content_based_sparsity.csv", index=False)
     print('Results saved to "content_based_sparsity.csv".')
     print("Results:")
     print(pd.DataFrame(sparsity_means).to_string(index=False))
 
+def test_period_breakdown(history, test, users, items, feature_matrix):
+    """
+    Evaluate the model separately on early and late test periods.
+    threshold median timestamp
+    """
+    threshold = test["Timestamp"].median()
+    periods = {
+        "early_period": test[test["Timestamp"] <= threshold],
+        "late_period": test[test["Timestamp"] > threshold]
+    }
+
+    # Training user interaction matrix
+    user_matrix = interaction_matrix(
+        history, users, items, feedback="implicit"
+    )
+
+    print('\nRunning early vs late test period analysis...')
+    results = []
+    for period_name, period_data in periods.items():
+        eval_period = evaluation_set(
+            history=history,
+            heldout=period_data,
+            users=users,
+            items=items
+        )
+
+        summary, per_user, top = validate_model(
+            feature_matrix,
+            user_matrix,
+            eval_period
+        )
+
+        results.append({
+            "Group": period_name,
+            **summary
+        })
+
+    return pd.DataFrame(results)
 
 def run_contentbased(train, validation, test, df_movies, out_dir="results"):
     """
@@ -204,33 +254,27 @@ def run_contentbased(train, validation, test, df_movies, out_dir="results"):
     """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-
     users, items = catalogue_index(train, validation, test)
-
-    # Implicit user matrix for training
-    user_matrix_train = interaction_matrix(train, users, items, feedback='implicit')
-
-    # Implicit user matrix for validation
     history = pd.concat([train, validation])
-    user_matrix_val = interaction_matrix(history, users, items, feedback='implicit')
 
-    genre_variants, year_variants = matrix_parser(df_movies, items)
+    user_matrix_train = interaction_matrix(train, users, items, feedback='implicit') # Implicit user matrix for training
+    user_matrix_val = interaction_matrix(history, users, items, feedback='implicit') # Implicit user matrix for validation
+    genre_variants, year_variants = matrix_parser(df_movies, items) # genre and year vectors
 
-    # evalutiation with validation
+    # evalutiation with validation and tune hyperparameters
     eval_val = evaluation_set(history=train, heldout=validation, users=users, items=items)
     results_df = tune_hyperparameters(genre_variants, year_variants, user_matrix_train, eval_val, out_dir)
-
     print("Five best combos with validation:")
     print(results_df.head(5).to_string(index=False))
 
     print('\nFitting model with tuned hyperparameters...')
-    bestModel = results_df.iloc[0] # Take first row
-    tuned_genre_matrix = genre_variants[bestModel["genre_encoding"]]
-    tuned_y_scale = bestModel["year_scale"]
-    tuned_year_matrix = year_variants[tuned_y_scale]
 
+    # Model with the best hyperparameter combo
+    bestModel = results_df.iloc[0] # Take first row
+    tuned_y_scale = bestModel["year_scale"]
     best_features = build_feature_matrix(
-        tuned_genre_matrix, tuned_year_matrix,
+        genre_variants[bestModel["genre_encoding"]],
+        year_variants[tuned_y_scale],
         year_weight=bestModel["year_weight"],
         l2_norm_items=bestModel["l2_genres"]
     )
@@ -238,15 +282,7 @@ def run_contentbased(train, validation, test, df_movies, out_dir="results"):
     # model with test data after tuning
     eval_test = evaluation_set(history=history, heldout=test, users=users, items=items)
     test_summary, per_user, _ = validate_model(best_features, user_matrix_val, eval_test)
-
-    # 95% CI for NDCG by generating N_BOOTSTRAP samples
-    ndcg_scores = per_user["ndcg"]
-    rng = np.random.default_rng(SEED)
-    boot = np.array([
-        rng.choice(ndcg_scores, size=len(ndcg_scores), replace=True).mean()
-        for _ in range(N_BOOTSTRAP)
-    ])
-    ci_lower, ci_upper = np.percentile(boot, [2.5, 97.5])
+    ci_lower, ci_upper = CI_95(per_user)
 
     test_result = []
     test_result.append({
@@ -264,8 +300,19 @@ def run_contentbased(train, validation, test, df_movies, out_dir="results"):
     print("Final model:")
     print(pd.DataFrame(test_result).to_string(index=False))
 
-    run_contentsparsity(train, validation, test, best_features, out_dir)
+    # run sparsity analysis
+    content_sparsity(train, validation, test, best_features, out_dir)
 
+    # run low vs high activity user analysis
+    print('\nRunning low- vs high-activity user analysis...')
+    user_activity_results = user_activity_breakdown(history, per_user)
+    user_activity_results.to_csv(out_dir / "content_based_user_activity.csv",index=False)
+    print('Results saved to "content_based_user_activity.csv".')
+
+    # early vs late test period
+    test_period_results = test_period_breakdown(history, test, users, items, best_features)
+    test_period_results.to_csv(out_dir / "content_based_early_late.csv", index=False)
+    print('Results saved to "content_based_early_late.csv".')
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
