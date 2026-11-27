@@ -30,14 +30,27 @@ N_GROUPS = 100
 MIN_POSITIVES = 10
 KNN = ("cosine", 800)
 METRICS = ["group_satisfaction", "disagreement", "min_satisfaction"]
+APPROVAL_TAU = 0.75
+MIN_APPROVALS = 3
 
 
 def least_misery(member_scores):
     """Group score of a movie: the lowest normalised score any member gives it."""
     return member_scores.min(axis=0)
 
+def majority(member_scores):
+    """Movie scores as approved when score is over 0.75. If at least 3 approves movie qualifies."""
+    approvals = (member_scores > APPROVAL_TAU).sum(axis=0)
+    mean_score = member_scores.mean(axis=0)
+    qualifies = approvals >= MIN_APPROVALS
 
-STRATEGIES = {"Least Misery": least_misery}
+    return np.where(qualifies, approvals + 1e-6 * mean_score, -1.0)
+
+
+STRATEGIES = {
+    "Least Misery": least_misery,
+    "Majority": majority
+}
 
 
 def similar_groups(X, rng):
