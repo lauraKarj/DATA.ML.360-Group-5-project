@@ -36,8 +36,14 @@ def least_misery(member_scores):
     """Group score of a movie: the lowest normalised score any member gives it."""
     return member_scores.min(axis=0)
 
+def average(member_scores):
+    """Group score of a movie: mean of the members' normalised scores."""
+    return member_scores.mean(axis=0)
 
-STRATEGIES = {"Least Misery": least_misery}
+
+STRATEGIES = {"Least Misery": least_misery,
+              "Average": average,
+}
 
 
 def similar_groups(X, rng):

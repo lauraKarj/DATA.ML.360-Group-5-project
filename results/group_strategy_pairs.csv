@@ -1,0 +1,4 @@
+strategy,reference,metric,mean_diff,ci_low,ci_high,wilcoxon_p
+Least Misery,Average,group_satisfaction,-0.0047943876,-0.0059410343,-0.003788081,2.1329837e-16
+Least Misery,Average,disagreement,-0.0010091567,-0.003541214,0.0012916777,0.8323035
+Least Misery,Average,min_satisfaction,-0.0027406109,-0.0046411557,-0.00062502443,0.0013512439
