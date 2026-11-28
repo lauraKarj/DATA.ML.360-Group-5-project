@@ -99,7 +99,10 @@ Linux / macOS:
 
 ```./venv/bin/python run_all.py --data-dir ml-1m```
 
-The script automatically (Part 1):
+The script automatically 
+
+Part 1:
+
 - Performs data preparation and generates distribution plots.
 - Runs the Item-KNN model and evaluation.
 - Runs the Most Popular model and evaluation.
@@ -113,7 +116,8 @@ Runs the Mult-DAE disaggregated analysis (user activity, head vs long-tail movie
 
 Part 3:
 
-- Runs the group recommendations (Track C): 100 similar groups of four users, item-kNN scores per member, and the aggregation strategies (Least Misery so far) evaluated on group satisfaction, disagreement and minimum member satisfaction with 95% bootstrap CIs.
+- Runs the group recommendations (Track C): 100 similar groups of four users, item-kNN scores per member, and the aggregation strategies (Average, Least Misery and Majority) evaluated on group satisfaction, disagreement and minimum member satisfaction with 95% bootstrap CIs.
+- Runs a sequential group recommendation scenario with average aggregation strategy. Evaluates on group satisfaction, disagreement and minimum member satisfaction.
 
 All parts:
 

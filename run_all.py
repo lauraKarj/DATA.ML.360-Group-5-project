@@ -37,7 +37,7 @@ def main():
     run_matrix_factorization(*_load_split(args.data_dir),out_dir=args.out_dir)
     # Part 2: Run content-based model and its disaggregated analysis and sparsity ablation
     run_contentbased(*_load_split(args.data_dir), df_movies, out_dir=args.out_dir)
-    # Part 3: group recommendations for similar groups of four (aggregation strategies)
+    # Part 3: group recommendations for similar groups of four (aggregation strategies), sequential group-recommendation scenario
     group_recommendation.run(*_load_split(args.data_dir), out_dir=args.out_dir)
 
 if __name__ == "__main__":

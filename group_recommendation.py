@@ -32,6 +32,7 @@ KNN = ("cosine", 800)
 METRICS = ["group_satisfaction", "disagreement", "min_satisfaction"]
 APPROVAL_TAU = 0.75
 MIN_APPROVALS = 3
+ROUNDS = 10
 
 
 def least_misery(member_scores):
@@ -46,8 +47,12 @@ def majority(member_scores):
 
     return np.where(qualifies, approvals + 1e-6 * mean_score, -1.0)
 
+def average(member_scores):
+    """Group score of a movie: mean of the members' normalised scores."""
+    return member_scores.mean(axis=0)
 
 STRATEGIES = {
+    "Average": average,
     "Least Misery": least_misery,
     "Majority": majority
 }
@@ -125,6 +130,39 @@ def compare(per_group, a, b):
                      "wilcoxon_p": stats.wilcoxon(d).pvalue if np.any(d != 0) else 1.0})
     return rows
 
+def sequential_average(member_scores, seen, rounds=10):
+    """Sequential recommendation with average aggregation.
+    Members who have been less satisfied so far get a higher weight in later rounds.
+    Rounds run 10 (ROUNDS) times and take TOP_N recommendations."""
+    n_members = member_scores.shape[0]
+    available = ~seen
+
+    round_results, state = [], []
+    sum_sat = np.zeros(n_members)
+    for r in range(rounds):
+        if r == 0:
+            w = np.ones(n_members)
+            mean_sat = np.zeros(n_members)
+        else:
+            mean_sat = sum_sat / r
+            deficit = 1.0 - mean_sat / max(mean_sat.max(), 1e-12) # difference to most satisfied of the group
+            w = 1.0 + deficit
+
+        state.append({"carried": mean_sat.copy()})
+
+        agg = (member_scores * w[:, None]).mean(axis=0) # add weights to aggregate
+        agg = np.where(available, agg, -np.inf)
+        top = np.argsort(-agg)[:TOP_N]
+
+        movies_available = np.where(available, member_scores, 0)
+        recommendations_available = -np.sort(-movies_available, axis=1)[:, :TOP_N].sum(axis=1)
+        sat = member_scores[:, top].sum(axis=1) / np.maximum(recommendations_available, 1e-12)
+
+        sum_sat += sat
+        available[top] = False # took away prev recommended movies
+        round_results.append(sat)
+
+    return np.array(round_results), state
 
 def run(train, validation, test, out_dir="results"):
     """1) similar groups from the history (train + validation), 2) member item-kNN scores,
@@ -145,6 +183,7 @@ def run(train, validation, test, out_dir="results"):
                                    .sum(axis=1)).mean()
 
     group_rows, rows = [], []
+    seq_rows = []
     for g, members in enumerate(groups):
         seen = rated[members].getnnz(axis=0) > 0
         scores = np.asarray(item_knn.knn_scores(X[members], S_k))
@@ -157,6 +196,13 @@ def run(train, validation, test, out_dir="results"):
             rows.append({"group": g, "strategy": name, **group_metrics(sat),
                          "member_satisfaction": " ".join(f"{s:.4f}" for s in sat),
                          "movies": " ".join(map(str, items[top]))})
+
+        hist, state = sequential_average(scores, seen, rounds=ROUNDS)
+        for round, (sat, st) in enumerate(zip(hist, state), start=1):
+            seq_rows.append({"group": g, "round": round, **group_metrics(sat),
+                             "member_satisfaction": " ".join(f"{s:.4f}" for s in sat),
+                             "carried_satisfaction_mean": st["carried"].mean()
+            })
 
     group_table = pd.DataFrame(group_rows)
     per_group = pd.DataFrame(rows)
@@ -174,6 +220,11 @@ def run(train, validation, test, out_dir="results"):
         pairs.to_csv(out_dir / "group_strategy_pairs.csv", index=False)
         print(pairs.round(4).to_string(index=False))
 
+    seq = pd.DataFrame(seq_rows)
+    summary_cols = list(METRICS) + ["carried_satisfaction_mean"]
+    seq_summary = seq.groupby("round")[summary_cols].mean().round(4).reset_index()
+    seq_summary.to_csv(out_dir / "group_sequential_average.csv", index=False)
+    print(seq_summary.to_string(index=False))
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
