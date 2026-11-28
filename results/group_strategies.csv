@@ -1,0 +1,4 @@
+strategy,n_groups,group_satisfaction,group_satisfaction_ci_low,group_satisfaction_ci_high,disagreement,disagreement_ci_low,disagreement_ci_high,min_satisfaction,min_satisfaction_ci_low,min_satisfaction_ci_high
+Average,100,0.98712325,0.98490393,0.98906446,0.025816303,0.021305557,0.030946806,0.97136533,0.96599764,0.9762113
+Least Misery,100,0.982329,0.9792784,0.9850053,0.024807146,0.021000357,0.029133322,0.9686247,0.963341,0.9733077
+Majority,100,0.9864762,0.9841694,0.988526,0.025394332,0.021009265,0.03036259,0.97133255,0.96599066,0.9760998

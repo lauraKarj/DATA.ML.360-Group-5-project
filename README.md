@@ -99,7 +99,10 @@ Linux / macOS:
 
 ```./venv/bin/python run_all.py --data-dir ml-1m```
 
-The script automatically (Part 1):
+The script automatically 
+
+Part 1:
+
 - Performs data preparation and generates distribution plots.
 - Runs the Item-KNN model and evaluation.
 - Runs the Most Popular model and evaluation.
@@ -111,7 +114,12 @@ Runs the Mult-DAE disaggregated analysis (user activity, head vs long-tail movie
 - Runs the Matrix Factorization (ALS) model: tuning on validation and test evaluation with five seeds as well as the disaggregated analysis (user activity & timestamps) as well sparsity ablation on 50% and 20% rating data with random subsampling
 - Runs the Content-based model: tuning on validation and test evaluation with 95% bootstrap CI. Runs the Content-model disaggregated analysis (user activity, test timestamps) and sparsity ablation on 50% and 20% rating data with random subsampling with 3 seeds.
 
-Both parts:
+Part 3:
+
+- Runs the group recommendations (Track C): 100 similar groups of four users, item-kNN scores per member, and the aggregation strategies (Average, Least Misery and Majority) evaluated on group satisfaction, disagreement and minimum member satisfaction with 95% bootstrap CIs.
+- Runs a sequential group recommendation scenario with average aggregation strategy. Evaluates on group satisfaction, disagreement and minimum member satisfaction.
+
+All parts:
 
 - Save CSV results in the results directory.
 - Save generated figures in the figures directory.
@@ -127,6 +135,7 @@ DATA.ML.360-GROUP-5-project
 ├── content_based.py # Part 2
 ├── data_preparation.py
 ├── evaluation.py
+├── group_recommendation.py # Part 3 groups and aggregation strategies
 ├── item_knn.py
 ├── matrix_factorization.py # Part 2
 ├── most_popular.py

@@ -1,0 +1,10 @@
+strategy,reference,metric,mean_diff,ci_low,ci_high,wilcoxon_p
+Average,Least Misery,group_satisfaction,0.0047943876,0.003788081,0.0059410343,2.1329837e-16
+Average,Least Misery,disagreement,0.0010091567,-0.0012916777,0.003541214,0.8323035
+Average,Least Misery,min_satisfaction,0.0027406109,0.00062502443,0.0046411557,0.0013512439
+Average,Majority,group_satisfaction,0.0006471926,0.0003260296,0.0010626224,1.3898021e-05
+Average,Majority,disagreement,0.00042197228,-0.0011600159,0.0018300653,0.49263352
+Average,Majority,min_satisfaction,3.2806398e-05,-0.0011682716,0.0013688391,0.79824764
+Least Misery,Majority,group_satisfaction,-0.0041471953,-0.005244208,-0.0031919484,4.1629234e-15
+Least Misery,Majority,disagreement,-0.00058718445,-0.0030034287,0.0015475835,0.8748358
+Least Misery,Majority,min_satisfaction,-0.0027078046,-0.004636668,-0.0005968543,0.00049473345

@@ -12,6 +12,7 @@ from data_preparation import (load_data, run_preparation)
 from most_popular import (run_mostpop)
 from content_based import run_contentbased
 from matrix_factorization import run_matrix_factorization
+import group_recommendation
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -36,6 +37,8 @@ def main():
     run_matrix_factorization(*_load_split(args.data_dir),out_dir=args.out_dir)
     # Part 2: Run content-based model and its disaggregated analysis and sparsity ablation
     run_contentbased(*_load_split(args.data_dir), df_movies, out_dir=args.out_dir)
+    # Part 3: group recommendations for similar groups of four (aggregation strategies), sequential group-recommendation scenario
+    group_recommendation.run(*_load_split(args.data_dir), out_dir=args.out_dir)
 
 if __name__ == "__main__":
     main()

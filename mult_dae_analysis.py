@@ -39,13 +39,64 @@ def selected_config(out_dir):
         int(best["best_epoch"])
 
 
-def model_scores(history, eval_set, users, items, config, epochs, seed):
-    """Scores of the three models fitted on `history` for the users of `eval_set`."""
+def model_scores(history, eval_sets, users, items, config, epochs, seed):
+    """Scores of the three models fitted on `history`, one array per evaluation set."""
     X = interaction_matrix(history, users, items, "implicit")
     dae, _ = mult_dae.fit(X, config, seed, epochs=epochs)
-    return {DAE: mult_dae.score(dae, X[eval_set.rows]),
-            KNN: mult_dae.knn_reference(history, eval_set, users, items),
-            POP: most_popular.all_time_scores(history, items, len(eval_set.rows))}
+    feedback, measure, k = mult_dae.KNN_REFERENCE
+    X_knn = interaction_matrix(history, users, items, feedback)
+    S_k = item_knn.prune(item_knn.item_similarity(X_knn, measure), k)
+    W = item_knn.history_weights(X_knn, feedback)
+    return {DAE: [mult_dae.score(dae, X[s.rows]) for s in eval_sets],
+            KNN: [item_knn.knn_scores(W[s.rows], S_k) for s in eval_sets],
+            POP: [most_popular.all_time_scores(history, items, len(s.rows)) for s in eval_sets]}
+
+
+def group_metrics(top, relevant, mask):
+    """Mean Precision@10, Recall@10 and NDCG@10 over the users in `mask` with at least one relevant
+    movie, and the catalogue coverage of their lists."""
+    keep = mask & (relevant.sum(axis=1) > 0)
+    metrics = per_user_metrics(top[keep], relevant[keep])
+    return {"Precision@10": metrics["precision"].mean(), "Recall@10": metrics["recall"].mean(),
+            "NDCG@10": metrics["ndcg"].mean(), "Catalogue coverage": len(np.unique(top[keep])) / relevant.shape[1],
+            "n_users": int(keep.sum())}
+
+
+def workbook_disaggregated(tops, eval_sets, history, test, head):
+    """Mult-DAE rows for the workbook sheet "Part 2 - Disaggregated": one per breakdown x group.
+    tops[model] is a list (one entry per seed) of the top-10 lists for each evaluation set."""
+    full, early, late = eval_sets
+    activity = history.groupby("UserID").size().reindex(full.user_ids).to_numpy()
+    median = np.median(activity)
+    split = pd.to_datetime(test["Timestamp"].median(), unit="s").strftime("%Y-%m-%d")
+    everyone = np.ones(len(full.user_ids), dtype=bool)
+    groups = [
+        ("User activity", "Low activity", f"Users with <= median history ratings ({median:.0f})", 0,
+         full.relevant, activity <= median),
+        ("User activity", "High activity", f"Users with > median history ratings ({median:.0f})", 0,
+         full.relevant, activity > median),
+        ("Test period", "Early", f"Test ratings before the median test timestamp ({split})", 1,
+         early.relevant, np.ones(len(early.user_ids), dtype=bool)),
+        ("Test period", "Late", f"Test ratings from the median test timestamp ({split}) on", 2,
+         late.relevant, np.ones(len(late.user_ids), dtype=bool)),
+        ("Item popularity", "Head", "Relevant movies among the 20% most-rated movies in the history", 0,
+         full.relevant & head, everyone),
+        ("Item popularity", "Long tail", "Relevant movies outside the 20% most-rated movies in the history", 0,
+         full.relevant & ~head, everyone),
+    ]
+    rows = []
+    for model, runs in [(DAE, tops[DAE])]:
+        for dimension, group, definition, period, relevant, mask in groups:
+            per_run = pd.DataFrame([group_metrics(run[period], relevant, mask) for run in runs]).mean()
+            note = f"{int(per_run['n_users'])} users"
+            if dimension == "Test period":
+                note += f", {eval_sets[period].n_cold} cold users excluded"
+            rows.append({"Model": model, "Breakdown dimension": dimension, "Group": group,
+                         "Definition / threshold": definition,
+                         **{c: per_run[c] for c in ["Precision@10", "Recall@10", "NDCG@10"]},
+                         "Catalogue coverage": per_run["Catalogue coverage"] if dimension == "Test period" else None,
+                         "Seed(s)": "42-44 (mean)", "Notes": note})
+    return pd.DataFrame(rows)
 
 
 def per_user(top, eval_set, head):
@@ -100,21 +151,27 @@ def run(train, validation, test, out_dir="results"):
     users, items = catalogue_index(train, validation, test)
     history = pd.concat([train, validation])
     eval_set = evaluation_set(history, test, users, items)
+    middle = test["Timestamp"].median()
+    eval_sets = [eval_set, evaluation_set(history, test[test["Timestamp"] < middle], users, items),
+                 evaluation_set(history, test[test["Timestamp"] >= middle], users, items)]
     counts = history["MovieID"].value_counts().reindex(items, fill_value=0)
     head = np.zeros(len(items), dtype=bool)
     head[np.argsort(-counts.to_numpy(), kind="stable")[:int(round(HEAD_SHARE * len(items)))]] = True
     print(f"Head: {head.sum()} movies with >= {counts[head].min()} history ratings "
           f"({counts[head].sum() / counts.sum():.1%} of history ratings); tail: {(~head).sum()} movies")
 
-    levels, pairs = [], []
+    levels, pairs, workbook_sparsity = [], [], []
     for fraction in FRACTIONS:
-        draws = {}
+        draws, summaries, tops = {}, {}, {}
         for draw in range(DRAWS):
             seed = SEED + draw
             sample = history if fraction == 1.0 else history.sample(frac=fraction, random_state=seed)
-            for model, scores in model_scores(sample, eval_set, users, items, config, epochs, seed).items():
-                top = evaluate(scores, eval_set)[2]
+            sets = eval_sets if fraction == 1.0 else eval_sets[:1]
+            for model, scores in model_scores(sample, sets, users, items, config, epochs, seed).items():
+                summary, _, top = evaluate(scores[0], eval_set)
                 draws.setdefault(model, []).append(per_user(top, eval_set, head))
+                summaries.setdefault(model, []).append(summary)
+                tops.setdefault(model, []).append([top] + [evaluate(sc, es)[2] for sc, es in zip(scores[1:], sets[1:])])
             empty = (interaction_matrix(sample, users, items, "implicit")[eval_set.rows].getnnz(axis=1) == 0).sum()
             print(f"{fraction:.0%} of the history, draw {draw + 1}: {len(sample)} ratings, "
                   f"{empty} evaluated users without a positive rating left")
@@ -123,6 +180,16 @@ def run(train, validation, test, out_dir="results"):
             table = disaggregate(results, history, eval_set)
             table.to_csv(out_dir / "mult_dae_disaggregated.csv", index=False)
             print(table.round(4).to_string(index=False))
+            table = workbook_disaggregated(tops, eval_sets, history, test, head)
+            table.to_csv(out_dir / "workbook_part2_disaggregated.csv", index=False)
+            print(table.round(4).to_string(index=False))
+        mean = pd.DataFrame(summaries[DAE]).mean()
+        workbook_sparsity.append({
+            "Model": DAE, "Training interactions (%)": f"{fraction:.0%}",
+            "Precision@10": mean["precision@10"], "Recall@10": mean["recall@10"], "NDCG@10": mean["ndcg@10"],
+            "Catalogue coverage": mean["coverage"], "Seed(s)": "42-44 (mean)",
+            "Notes": f"Mean of {DRAWS} subsample draws, model seed = draw seed" if fraction < 1.0
+            else f"Full history, mean of {DRAWS} model seeds"})
         for model, frame in results.items():
             per_draw = [f["ndcg"].mean() for f in draws[model]]
             levels.append({"fraction": fraction, "model": model, "ndcg@10": frame["ndcg"].mean(),
@@ -132,7 +199,8 @@ def run(train, validation, test, out_dir="results"):
             diff, low, high, _ = paired(results[a]["ndcg"], results[b]["ndcg"])
             pairs.append({"fraction": fraction, "comparison": f"{a} - {b}", "ndcg_diff": diff,
                           "ci_low": low, "ci_high": high})
-    for name, rows in [("mult_dae_sparsity.csv", levels), ("mult_dae_sparsity_pairs.csv", pairs)]:
+    for name, rows in [("mult_dae_sparsity.csv", levels), ("mult_dae_sparsity_pairs.csv", pairs),
+                       ("workbook_part2_sparsity.csv", workbook_sparsity)]:
         table = pd.DataFrame(rows)
         table.to_csv(out_dir / name, index=False)
         print(table.round(4).to_string(index=False))
